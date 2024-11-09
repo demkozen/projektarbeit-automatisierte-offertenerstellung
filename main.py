@@ -30,7 +30,40 @@ def get_gmail_service():
     return build("gmail", "v1", credentials=creds)
 
 
+def get_latest_email(service):
+    # Die neuste Mail inklusive Betreff und Inhalt wird ausgelesen
+    try:
+        # Die neuste Mail wird ausgewählt.
+        results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=1).execute()
+        messages = results.get('messages', [])
+        if not messages:
+            print("Keine E-Mail gefunden.")
+            return None
+        message_id = messages[0]['id']
+        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
 
+        #Betreff wird aus dem Header extrahiert.
+        headers = message['payload']['headers']
+        subject = next(header['value'] for header in headers if header['name'] == 'Subject')
+
+        # Der Mailinhalt wird als base64 extrahiert und in utf-8 decoded damit es leserlich ist.
+        parts = message['payload'].get('parts', [])
+        email_body = None
+        for part in parts:
+            if part['mimeType'] == 'text/plain':
+                email_body = part['body']['data']
+                break
+        if email_body:
+            email_body = base64.urlsafe_b64decode(email_body).decode('utf-8')
+        else:
+            email_body = "Kein Mailinhalt gefunden."
+
+        #Betreff und Body werden in der Konsole angezeigt.
+        print(f"Betreff: {subject}\nInhalt: {email_body}\n")
+        return f"Betreff: {subject}\nInhalt: {email_body}"
+    except HttpError as error:
+        print(f"Ein Fehler ist aufgetreten: {error}")
+        return None
 
 
 def list_labels(service):
@@ -48,8 +81,9 @@ def list_labels(service):
         print(f"An error occurred: {error}")
 
 def main():
-    service = get_gmail_service()
+    service = get_gmail_service() # Verbindung zu GMAILService sicherstellen
     list_labels(service)  # Labels abrufen
+    get_latest_email(service)  # Neueste E-Mail abrufen und anzeigen
 
 if __name__ == "__main__":
     main()
