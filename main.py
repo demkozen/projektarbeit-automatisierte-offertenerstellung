@@ -13,6 +13,7 @@ from g4f.client import Client
 
 # Globale Variablen
 SCOPES = ["https://www.googleapis.com/auth/gmail.send", "https://www.googleapis.com/auth/gmail.readonly"]
+# Ausgangsstandort für Entfernungsberechnung
 BASE_LOCATION = "Rothrist, Switzerland"
 
 # Gmail-Service einrichten
@@ -21,18 +22,23 @@ def get_gmail_service():
     Authentifiziert den Benutzer und gibt den Gmail-Service zurück.
     """
     creds = None
+    # Prüfen, ob ein gespeicherter Token existiert
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
+    # Falls Token nicht gültig oder nicht vorhanden ist, Authentifizierung starten
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
+            # Lokalen Server für OAuth2-Authentifizierung starten
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
+        # Token für zukünftige Sitzungen speichern
         with open("token.json", "w") as token:
             token.write(creds.to_json())
 
+    # Gmail-Service erstellen und zurückgeben
     return build("gmail", "v1", credentials=creds)
 
 # Neueste E-Mail abrufen
@@ -41,6 +47,7 @@ def get_latest_email(service):
     Liest die neueste E-Mail im Posteingang aus und gibt Betreff und Body zurück.
     """
     try:
+        # Abrufen der neuesten E-Mail aus dem Posteingang
         results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=1).execute()
         messages = results.get('messages', [])
 
@@ -48,19 +55,23 @@ def get_latest_email(service):
             print("Keine Nachrichten gefunden.")
             return None
 
+        # Nachrichtendetails abrufen
         message_id = messages[0]['id']
         message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
 
+        # Betreff extrahieren
         headers = message['payload']['headers']
         subject = next(header['value'] for header in headers if header['name'] == 'Subject')
 
+        # Nachrichtentext (Body) extrahieren
         parts = message['payload'].get('parts', [])
         email_body = None
         for part in parts:
-            if part['mimeType'] == 'text/plain':
+            if part['mimeType'] == 'text/plain':  # Nur Text-E-Mails verarbeiten
                 email_body = part['body']['data']
                 break
 
+        # Nachrichtendaten dekodieren
         email_body = base64.urlsafe_b64decode(email_body).decode('utf-8') if email_body else "Kein Textinhalt gefunden."
         print(f"Betreff: {subject}\nInhalt: {email_body}\n")
         return f"Betreff: {subject}\nInhalt: {email_body}"
@@ -74,6 +85,7 @@ def extract_sender_email(service):
     Extrahiert die Absender-E-Mail-Adresse aus der neuesten E-Mail.
     """
     try:
+        # Abrufen der neuesten E-Mail
         results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=1).execute()
         messages = results.get('messages', [])
 
@@ -84,9 +96,11 @@ def extract_sender_email(service):
         message_id = messages[0]['id']
         message = service.users().messages().get(userId='me', id=message_id, format='metadata').execute()
 
+        # Extrahieren des Absenders aus den Headern
         headers = message['payload']['headers']
         sender = next(header['value'] for header in headers if header['name'] == 'From')
 
+        # E-Mail-Adresse aus dem Absender-Header extrahieren
         match = re.search(r'<(.+?)>', sender)
         if match:
             sender_email = match.group(1)
@@ -104,6 +118,7 @@ def extract_location_from_email(email_body):
     """
     Extrahiert den Standort aus dem E-Mail-Inhalt.
     """
+    # Nach einem Standort suchen (z. B. "Location: Olten")
     location_match = re.search(r'Location:\s*(\w+)', email_body)
     if location_match:
         location = location_match.group(1)
@@ -198,11 +213,10 @@ def send_email(service, recipient_email, subject, message_body):
     Sendet eine E-Mail mit dem Gmail API.
     """
     try:
+        # E-Mail erstellen und senden
         message = MIMEText(message_body)
         message['to'] = recipient_email
         message['from'] = "me"
-
-
         message['subject'] = subject
 
         encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
