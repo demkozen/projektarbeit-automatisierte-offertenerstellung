@@ -1,0 +1,54 @@
+# Preisliste für Reinigungsdienste
+
+## Standard Dienstleistungen:
+
+1. **Wohnraumreinigung** (pro Quadratmeter):
+   - Bis 30m²: 5,00 CHF/m²
+   - 31m² bis 60m²: 4,50 CHF/m²
+   - Über 60m²: 4,00 CHF/m²
+
+2. **Schlafzimmerreinigung** (pro Raum):
+   - Standard: 25,00 CHF pro Zimmer
+   - Größeres Zimmer (über 20m²): 30,00 CHF pro Zimmer
+
+3. **Badezimmerreinigung** (pro Badezimmer):
+   - Kleines Badezimmer: 20,00 CHF
+   - Großes Badezimmer: 30,00 CHF
+
+4. **Küchenreinigung** (pauschal):
+   - Standard-Küche: 35,00 CHF
+   - Große Küche (inkl. Geräte): 45,00 CHF
+
+5. **Fensterreinigung** (pro Fenster):
+   - Standard Fenster: 10,00 CHF
+   - Großes Fenster: 15,00 CHF
+
+6. **Bodenreinigung** (nach Art des Bodens, pro Quadratmeter):
+   - Parkett/Laminat: 4,50 CHF/m²
+   - Fliesen: 4,00 CHF/m²
+   - Teppich: 6,00 CHF/m²
+
+---
+
+## Zusätzliche Dienstleistungen:
+
+1. **Möbelreinigung** (pro Sitzplatz):
+   - Sofa: 20,00 CHF pro Sitzplatz
+   - Sessel: 15,00 CHF pro Stück
+
+2. **Reinigung von Haushaltsgeräten** (pro Gerät):
+   - Kühlschrank: 15,00 CHF
+   - Backofen: 20,00 CHF
+   - Mikrowelle: 10,00 CHF
+
+3. **Fensterlädenreinigung**:
+   - Standard-Fensterläden: 8,00 CHF pro Fenster
+   - Großes Fenster: 12,00 CHF pro Fenster
+
+---
+
+## Sonderzuschläge:
+
+1. **Entfernungspauschale**:
+   - Bis 10 km: Keine zusätzlichen Kosten
+   - Über 10 km: 2,00 CHF pro km
