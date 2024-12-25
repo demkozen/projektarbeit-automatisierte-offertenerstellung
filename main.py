@@ -13,8 +13,7 @@ from g4f.client import Client
 
 # Globale Variablen
 SCOPES = ["https://www.googleapis.com/auth/gmail.send", "https://www.googleapis.com/auth/gmail.readonly"]
-# Ausgangsstandort für Entfernungsberechnung
-BASE_LOCATION = "Rothrist, Switzerland"
+BASE_LOCATION = "Langenthal, Switzerland"
 
 # Gmail-Service einrichten
 def get_gmail_service():
@@ -22,23 +21,18 @@ def get_gmail_service():
     Authentifiziert den Benutzer und gibt den Gmail-Service zurück.
     """
     creds = None
-    # Prüfen, ob ein gespeicherter Token existiert
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
-    # Falls Token nicht gültig oder nicht vorhanden ist, Authentifizierung starten
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # Lokalen Server für OAuth2-Authentifizierung starten
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
-        # Token für zukünftige Sitzungen speichern
         with open("token.json", "w") as token:
             token.write(creds.to_json())
 
-    # Gmail-Service erstellen und zurückgeben
     return build("gmail", "v1", credentials=creds)
 
 # Neueste E-Mail abrufen
@@ -47,7 +41,6 @@ def get_latest_email(service):
     Liest die neueste E-Mail im Posteingang aus und gibt Betreff und Body zurück.
     """
     try:
-        # Abrufen der neuesten E-Mail aus dem Posteingang
         results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=1).execute()
         messages = results.get('messages', [])
 
@@ -55,23 +48,19 @@ def get_latest_email(service):
             print("Keine Nachrichten gefunden.")
             return None
 
-        # Nachrichtendetails abrufen
         message_id = messages[0]['id']
         message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
 
-        # Betreff extrahieren
         headers = message['payload']['headers']
         subject = next(header['value'] for header in headers if header['name'] == 'Subject')
 
-        # Nachrichtentext (Body) extrahieren
         parts = message['payload'].get('parts', [])
         email_body = None
         for part in parts:
-            if part['mimeType'] == 'text/plain':  # Nur Text-E-Mails verarbeiten
+            if part['mimeType'] == 'text/plain':
                 email_body = part['body']['data']
                 break
 
-        # Nachrichtendaten dekodieren
         email_body = base64.urlsafe_b64decode(email_body).decode('utf-8') if email_body else "Kein Textinhalt gefunden."
         print(f"Betreff: {subject}\nInhalt: {email_body}\n")
         return f"Betreff: {subject}\nInhalt: {email_body}"
@@ -79,13 +68,13 @@ def get_latest_email(service):
         print(f"Ein Fehler ist aufgetreten: {error}")
         return None
 
-# Absenderadresse extrahieren
-def extract_sender_email(service):
+# Reply-To-Adresse extrahieren
+def extract_reply_to_email(service):
     """
-    Extrahiert die Absender-E-Mail-Adresse aus der neuesten E-Mail.
+    Extrahiert die Reply-To-E-Mail-Adresse aus der neuesten E-Mail.
+    Falls kein Reply-To-Header vorhanden ist, wird die From-Adresse verwendet.
     """
     try:
-        # Abrufen der neuesten E-Mail
         results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=1).execute()
         messages = results.get('messages', [])
 
@@ -96,42 +85,50 @@ def extract_sender_email(service):
         message_id = messages[0]['id']
         message = service.users().messages().get(userId='me', id=message_id, format='metadata').execute()
 
-        # Extrahieren des Absenders aus den Headern
         headers = message['payload']['headers']
-        sender = next(header['value'] for header in headers if header['name'] == 'From')
-
-        # E-Mail-Adresse aus dem Absender-Header extrahieren
-        match = re.search(r'<(.+?)>', sender)
-        if match:
-            sender_email = match.group(1)
-            print(f"Absender-E-Mail: {sender_email}")
-            return sender_email
+        reply_to = next((header['value'] for header in headers if header['name'].lower() == 'reply-to'), None)
+        if reply_to:
+            print(f"Reply-To-Adresse gefunden: {reply_to}")
+            return reply_to
         else:
-            print("Keine gültige E-Mail-Adresse im 'From'-Header gefunden.")
-            return None
+            # Fallback auf From-Adresse
+            from_email = next((header['value'] for header in headers if header['name'].lower() == 'from'), None)
+            print(f"Keine Reply-To-Adresse gefunden. Verwende From-Adresse: {from_email}")
+            return from_email
     except HttpError as error:
-        print(f"Ein Fehler ist aufgetreten: {error}")
+        print(f"HTTP-Fehler beim Abrufen der Reply-To-Adresse: {error}")
         return None
 
 # Standort aus E-Mail extrahieren
 def extract_location_from_email(email_body):
     """
-    Extrahiert den Standort aus dem E-Mail-Inhalt.
+    Extrahiert den Standort aus dem E-Mail-Inhalt basierend auf dem Schlüsselwort LOCATION:.
     """
-    # Nach einem Standort suchen (z. B. "Location: Olten")
-    location_match = re.search(r'Location:\s*(\w+)', email_body)
+    location_match = re.search(r'LOCATION:\s*(.+)', email_body, re.IGNORECASE)
     if location_match:
-        location = location_match.group(1)
+        location = location_match.group(1).strip()
         print(f"Extrahierter Standort: {location}")
         return location
     else:
         print("Kein Standort in der E-Mail gefunden.")
         return None
 
+# Standortbereinigung
+def clean_location(location):
+    """
+    Bereinigt die Schreibweise des Standorts für eine bessere Erkennung.
+    """
+    corrections = {
+        "Rothrit": "Rothrist"
+    }
+    for incorrect, correct in corrections.items():
+        location = location.replace(incorrect, correct)
+    return location
+
 # Koordinaten abrufen
 def get_coordinates(place_name):
     """
-    Verwendet Nominatim, um die Koordinaten eines Orts zu finden.
+    Verwendet Nominatim, um die Koordinaten eines Orts zu finden. Fügt einen Fallback hinzu.
     """
     url = "https://nominatim.openstreetmap.org/search"
     params = {'q': place_name, 'format': 'json', 'limit': 1}
@@ -146,6 +143,10 @@ def get_coordinates(place_name):
                 print(f"Gefundene Koordinaten für {place_name}: lat={lat}, lon={lon}")
                 return lat, lon
             else:
+                if "," in place_name:
+                    city = place_name.split(",")[0].strip()
+                    print(f"Fallback auf Stadt: {city}")
+                    return get_coordinates(city)
                 print(f"Keine Ergebnisse für {place_name}.")
                 return None
         elif response.status_code == 403:
@@ -165,33 +166,35 @@ def get_osrm_distance(lat1, lon1, lat2, lon2):
     Berechnet die Entfernung zwischen zwei Orten mit OSRM.
     """
     url = f"http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
+    print(f"OSRM API URL: {url}")
     try:
         response = requests.get(url)
         if response.status_code == 200:
             data = response.json()
             if data['routes']:
                 distance_meters = data['routes'][0]['distance']
+                print(f"Berechnete Entfernung in Metern: {distance_meters}")
                 return distance_meters / 1000  # Umrechnung in Kilometer
             else:
-                print("Keine Route gefunden.")
+                print("OSRM-API: Keine Route gefunden.")
                 return None
         else:
-            print(f"Fehler bei der Anfrage an OSRM: {response.status_code}")
+            print(f"OSRM-API Fehler: Statuscode {response.status_code}")
             return None
     except Exception as e:
-        print(f"Ein Fehler ist aufgetreten: {e}")
+        print(f"Ein Fehler ist bei der Anfrage an OSRM aufgetreten: {e}")
         return None
 
-# Preisliste lesen
-def read_price_list(file_path='price_list.txt'):
+# Template lesen
+def read_template(file_path='template.txt'):
     """
-    Liest die Preisliste aus einer Datei.
+    Liest das Template (Rahmenbedingungen + Preisliste) aus einer Datei.
     """
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as file:
             return file.read()
     else:
-        print("Preisliste nicht gefunden.")
+        print(f"Template-Datei '{file_path}' nicht gefunden.")
         return None
 
 # GPT-Antwort generieren
@@ -210,10 +213,9 @@ def generate_gpt_reply(user_input):
 # E-Mail senden
 def send_email(service, recipient_email, subject, message_body):
     """
-    Sendet eine E-Mail mit dem Gmail API.
+    Sendet eine E-Mail mit der Gmail API.
     """
     try:
-        # E-Mail erstellen und senden
         message = MIMEText(message_body)
         message['to'] = recipient_email
         message['from'] = "me"
@@ -230,50 +232,67 @@ def send_email(service, recipient_email, subject, message_body):
         return None
 
 # Daten an GPT senden
-def send_to_gpt(email_content, distance, price_list):
+def send_to_gpt(email_content, distance, template):
     """
-    Sendet die E-Mail, Entfernung und Preisliste an GPT und erhält eine Antwort.
+    Sendet die E-Mail, Entfernung und das Template an GPT und erhält eine Antwort.
     """
     full_message = f"""
+{template}
+
+### Anfrage:
 E-Mail-Inhalt:
 {email_content}
 
-Entfernung in km: {distance} km
-
-Preisliste:
-{price_list}
-
-Erstelle eine professionelle Antwort basierend auf den Angaben."""
+Entfernung in km: {distance:.2f} km
+"""
     return generate_gpt_reply(full_message)
 
 # Hauptlogik
 if __name__ == '__main__':
     service = get_gmail_service()
     if service:
+        print("Gmail-Service erfolgreich initialisiert.")
+
         latest_email_content = get_latest_email(service)
         if latest_email_content:
+            print(f"Neueste E-Mail-Inhalte: {latest_email_content}")
+
             location_from_email = extract_location_from_email(latest_email_content)
             if location_from_email:
+                location_from_email = clean_location(location_from_email)  # Bereinigung
+                print(f"Bereinigter Standort: {location_from_email}")
+
                 origin_coords = get_coordinates(BASE_LOCATION)
-                destination_coords = get_coordinates(f"{location_from_email}, Switzerland")
+                destination_coords = get_coordinates(location_from_email)
                 if origin_coords and destination_coords:
+                    print(f"Koordinaten abgerufen: Origin {origin_coords}, Destination {destination_coords}")
+
                     lat1, lon1 = origin_coords
                     lat2, lon2 = destination_coords
                     distance = get_osrm_distance(lat1, lon1, lat2, lon2)
                     if distance:
-                        price_list = read_price_list()
-                        if price_list:
-                            gpt_response = send_to_gpt(latest_email_content, distance, price_list)
-                            sender_email = extract_sender_email(service)
-                            if sender_email:
-                                send_email(service, sender_email, "Ihr Angebot", gpt_response)
+                        print(f"Berechnete Entfernung: {distance} km")
+
+                        template = read_template()
+                        if template:
+                            print("Template erfolgreich geladen.")
+
+                            gpt_response = send_to_gpt(latest_email_content, distance, template)
+                            if gpt_response:
+                                reply_to_email = extract_reply_to_email(service)
+                                if reply_to_email:
+                                    print(f"Reply-To-Adresse gefunden: {reply_to_email}")
+                                    print("Sende E-Mail an die Reply-To-Adresse...")
+                                    send_email(service, reply_to_email, "Ihr Angebot", gpt_response)
+                                else:
+                                    print("Fehler: Reply-To-Adresse konnte nicht extrahiert werden.")
                             else:
-                                print("Absender-E-Mail konnte nicht extrahiert werden.")
+                                print("Fehler: GPT konnte keine Antwort generieren.")
                         else:
-                            print("Preisliste konnte nicht gelesen werden.")
+                            print("Fehler: Template konnte nicht geladen werden.")
                     else:
-                        print("Entfernung konnte nicht berechnet werden.")
+                        print("Fehler: Entfernung konnte nicht berechnet werden.")
                 else:
-                    print("Koordinaten konnten nicht abgerufen werden.")
+                    print("Fehler: Koordinaten konnten nicht abgerufen werden.")
             else:
-                print("Standort in der E-Mail nicht gefunden.")
+                print("Fehler: Standort in der E-Mail nicht gefunden.")
