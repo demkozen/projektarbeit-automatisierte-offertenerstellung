@@ -11,62 +11,104 @@ from googleapiclient.errors import HttpError
 from email.mime.text import MIMEText
 from g4f.client import Client
 
-# Globale Variablen
+# Globale Variablen.
+# Scopes worauf das Skript zugriff hat.
+# Hauptstandort BASE_LOCATION ist Langenthal
 SCOPES = ["https://www.googleapis.com/auth/gmail.send", "https://www.googleapis.com/auth/gmail.readonly"]
 BASE_LOCATION = "Langenthal, Switzerland"
 
-# Gmail-Service einrichten
+# Diese Funktion wird verwendet, um die Verbindung zur Gmail API herzustellen.
 def get_gmail_service():
-    """
-    Authentifiziert den Benutzer und gibt den Gmail-Service zurück.
-    """
+
+    # Authentifiziert den Benutzer und gibt den Gmail-Service zurück. Token.json wird lokal gespeichert.
     creds = None
+    
+    # Überprüfen, ob bereits ein Authentifizierungs-Token vorhanden ist
+    # Die Datei "token.json" speichert die Anmeldedaten, falls der Nutzer schon einmal authentifiziert wurde
     if os.path.exists("token.json"):
+        # Lade die gespeicherten Anmeldedaten aus der Datei "token.json"
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
+    # Überprüfung ob die Anmeldedaten vorhanden und gültig sind
     if not creds or not creds.valid:
+
+        # Falls die Anmeldedaten existieren, aber abgelaufen sind, wird ein Refresh durchgeführt
+	# Token wird mit dem Refresh-Token aktualisiert
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            creds.refresh(Request())  
         else:
+
+            # Falls keine Anmeldedaten vorhanden sind oder keine Aktualisierung möglich ist wird OAuth gemacht mit credentials.json welches aus Google Auth Platform heruntergeladen wurde.
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+
+            # Der Nutzer wird weitergeleitet, wo er sich anmelden kann.
             creds = flow.run_local_server(port=0)
+        
+        # Nach der erfolgreichen Authentifizierung werden die Anmeldedaten in der Datei "token.json" gespeichert damit man sich nicht erneut authentifizieren muss.
         with open("token.json", "w") as token:
             token.write(creds.to_json())
 
+    # Return der Credentials für die Verbindung.
     return build("gmail", "v1", credentials=creds)
 
-# Neueste E-Mail abrufen
+
+# Diese Funktion ruft die aktuellste Nachricht aus dem Gmail-Posteingang ab und extrahiert den Betreff und den Textinhalt.
 def get_latest_email(service):
     """
-    Liest die neueste E-Mail im Posteingang aus und gibt Betreff und Body zurück.
+    Entnimmt die neueste E-Mail im Posteingang aus und gibt Betreff und Body zurück.
     """
     try:
+
+        # Abrufen der Liste von Nachrichten aus dem Gmail-Posteingang. Dabei sind die nachfolgenden Parameter festzulegen.
+        # - userId: 'me' (E-Mails des authentifizierten Benutzers)
+        # - labelIds: 'INBOX' (Nur Ergebnisse des Posteinganges)
+        # - maxResults: 1 (holt nur die neueste Nachricht)
         results = service.users().messages().list(userId='me', labelIds=['INBOX'], maxResults=1).execute()
+
+        # Extrahiert die das "Objekt" E-Mail und speichert es in einen Array. Man kann auch mehrere Messages in das Array speichern und später dann auslesen und evtl. nach einem spezifischen Betreff filtrieren.
         messages = results.get('messages', [])
 
+        # Wenn keine Nachrichten gefunden wurde, dann Konsoleneintrag.
         if not messages:
-            print("Keine Nachrichten gefunden.")
+            print("Keine E-Mail gefunden.")
             return None
 
+        # Abrufen der ID der neuesten Nachricht
         message_id = messages[0]['id']
+
+        # Format "Full" nimmt alle Header und den vollständigen Inhalt der Nachricht.
         message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
 
+        # Extrahieren der Header aus der Nachricht
         headers = message['payload']['headers']
+
+        # Suche nach dem 'Subject' im Header um den Betreff zu erhalten. next() iteriert über die Header bis ein Header mit dem Namen Subjekt gefunden wird.
         subject = next(header['value'] for header in headers if header['name'] == 'Subject')
 
+        # Extrahieren der E-Mail-Inhaltsabschnitte
         parts = message['payload'].get('parts', [])
+
         email_body = None
+
+        # Durchlaufen der Teile, um den einfachen Textinhalt in Plain Text zu finden
         for part in parts:
             if part['mimeType'] == 'text/plain':
                 email_body = part['body']['data']
                 break
 
+        # Falls kein Textinhalt gefunden wurde, wird ein Standardwert zurückgegeben. Es wird nach utf-8 dekodiert um es leserlich zu machen.
         email_body = base64.urlsafe_b64decode(email_body).decode('utf-8') if email_body else "Kein Textinhalt gefunden."
+
+        # Ausgabe des Betreffs und des Inhalts zur Überprüfung
         print(f"Betreff: {subject}\nInhalt: {email_body}\n")
+
         return f"Betreff: {subject}\nInhalt: {email_body}"
+
     except HttpError as error:
+        # Error-Handling
         print(f"Ein Fehler ist aufgetreten: {error}")
         return None
+
 
 # Reply-To-Adresse extrahieren
 def extract_reply_to_email(service):
@@ -102,7 +144,7 @@ def extract_reply_to_email(service):
 # Standort aus E-Mail extrahieren
 def extract_location_from_email(email_body):
     """
-    Extrahiert den Standort aus dem E-Mail-Inhalt basierend auf dem Schlüsselwort LOCATION:.
+    Extrahiert den Standort aus dem E-Mail-Inhalt basierend auf dem Schlüsselwort LOCATION:. Dieses wird in der Formularübermittlung fix festgelegt.
     """
     location_match = re.search(r'LOCATION:\s*(.+)', email_body, re.IGNORECASE)
     if location_match:
@@ -113,18 +155,6 @@ def extract_location_from_email(email_body):
         print("Kein Standort in der E-Mail gefunden.")
         return None
 
-# Standortbereinigung
-def clean_location(location):
-    """
-    Bereinigt die Schreibweise des Standorts für eine bessere Erkennung.
-    """
-    corrections = {
-        "Rothrit": "Rothrist"
-    }
-    for incorrect, correct in corrections.items():
-        location = location.replace(incorrect, correct)
-    return location
-
 # Koordinaten abrufen
 def get_coordinates(place_name):
     """
@@ -132,13 +162,14 @@ def get_coordinates(place_name):
     """
     url = "https://nominatim.openstreetmap.org/search"
     params = {'q': place_name, 'format': 'json', 'limit': 1}
-    headers = {'User-Agent': 'MyApp/1.0 (myemail@example.com)'}  # User-Agent erforderlich
+    headers = {'User-Agent': 'MyApp/1.0 (myemail@example.com)'}  # User-Agent erforderlich gemäss fehlermeldung. Exmple E-Mail wird zur erfüllung mitgegeben.
 
     try:
         response = requests.get(url, params=params, headers=headers)
         if response.status_code == 200:
             data = response.json()
             if data:
+		#Informationen aus erstem Array aus lat und lon
                 lat, lon = float(data[0]['lat']), float(data[0]['lon'])
                 print(f"Gefundene Koordinaten für {place_name}: lat={lat}, lon={lon}")
                 return lat, lon
@@ -174,7 +205,7 @@ def get_osrm_distance(lat1, lon1, lat2, lon2):
             if data['routes']:
                 distance_meters = data['routes'][0]['distance']
                 print(f"Berechnete Entfernung in Metern: {distance_meters}")
-                return distance_meters / 1000  # Umrechnung in Kilometer
+                return distance_meters / 1000  # Umrechnung in Meter
             else:
                 print("OSRM-API: Keine Route gefunden.")
                 return None
@@ -188,7 +219,7 @@ def get_osrm_distance(lat1, lon1, lat2, lon2):
 # Template lesen
 def read_template(file_path='template.txt'):
     """
-    Liest das Template (Rahmenbedingungen + Preisliste) aus einer Datei.
+    Liest das Template aus einer Datei.
     """
     if os.path.exists(file_path):
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -205,7 +236,7 @@ def generate_gpt_reply(user_input):
     client = Client()
     print("Sende Anfrage an GPT...")
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4",
         messages=[{"role": "user", "content": user_input}]
     )
     return response.choices[0].message.content
@@ -234,7 +265,7 @@ def send_email(service, recipient_email, subject, message_body):
 # Daten an GPT senden
 def send_to_gpt(email_content, distance, template):
     """
-    Sendet die E-Mail, Entfernung und das Template an GPT und erhält eine Antwort.
+    Sendet die E-Mail, Entfernung und das Template an das GPT-Modell.
     """
     full_message = f"""
 {template}
@@ -255,11 +286,8 @@ if __name__ == '__main__':
 
         latest_email_content = get_latest_email(service)
         if latest_email_content:
-            print(f"Neueste E-Mail-Inhalte: {latest_email_content}")
-
             location_from_email = extract_location_from_email(latest_email_content)
             if location_from_email:
-                location_from_email = clean_location(location_from_email)  # Bereinigung
                 print(f"Bereinigter Standort: {location_from_email}")
 
                 origin_coords = get_coordinates(BASE_LOCATION)
@@ -281,7 +309,6 @@ if __name__ == '__main__':
                             if gpt_response:
                                 reply_to_email = extract_reply_to_email(service)
                                 if reply_to_email:
-                                    print(f"Reply-To-Adresse gefunden: {reply_to_email}")
                                     print("Sende E-Mail an die Reply-To-Adresse...")
                                     send_email(service, reply_to_email, "Ihr Angebot", gpt_response)
                                 else:
