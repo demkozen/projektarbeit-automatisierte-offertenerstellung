@@ -288,8 +288,6 @@ if __name__ == '__main__':
         if latest_email_content:
             location_from_email = extract_location_from_email(latest_email_content)
             if location_from_email:
-                print(f"Bereinigter Standort: {location_from_email}")
-
                 origin_coords = get_coordinates(BASE_LOCATION)
                 destination_coords = get_coordinates(location_from_email)
                 if origin_coords and destination_coords:
