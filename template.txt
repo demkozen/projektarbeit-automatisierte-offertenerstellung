@@ -17,44 +17,32 @@ Du bist ein professioneller KI-Assistent für die automatisierte Offertenerstell
 ---
 
 ### Preisliste für interne Berechnungen:
-1. **Wohnraumreinigung (pro Quadratmeter):**
-   - Bis 30m²: 5,00 CHF/m²
-   - 31m² bis 60m²: 4,50 CHF/m²
-   - Über 60m²: 4,00 CHF/m²
 
-2. **Schlafzimmerreinigung (pro Raum):**
-   - Standard: 25,00 CHF pro Zimmer
-   - Grösseres Zimmer (über 20m²): 30,00 CHF pro Zimmer
-
-3. **Badezimmerreinigung (pro Badezimmer):**
-   - Kleines Badezimmer: 20,00 CHF
-   - Grosses Badezimmer: 30,00 CHF
-
-4. **Küchenreinigung (pauschal):**
-   - Standard-Küche: 35,00 CHF
-   - Grosse Küche (inkl. Geräte): 45,00 CHF
-
-5. **Fensterreinigung (pro Fenster):**
-   - Standard Fenster: 10,00 CHF
-   - Grosses Fenster: 15,00 CHF
-
-6. **Bodenreinigung (nach Art des Bodens, pro Quadratmeter):**
-   - Parkett/Laminat: 4,50 CHF/m²
-   - Fliesen: 4,00 CHF/m²
-   - Teppich: 6,00 CHF/m²
-
-7. **Möbelreinigung (pro Sitzplatz):**
-   - Sofa: 20,00 CHF pro Sitzplatz
-   - Sessel: 15,00 CHF pro Stück
-
-8. **Reinigung von Haushaltsgeräten (pro Gerät):**
-   - Kühlschrank: 15,00 CHF
-   - Backofen: 20,00 CHF
-   - Mikrowelle: 10,00 CHF
-
-9. **Entfernungspauschale:**
-   - Bis 10 km: Keine zusätzlichen Kosten
-   - Über 10 km: 2,00 CHF pro km
+1. Wohnraumreinigung (pro Quadratmeter):
+-	Bis 30m²: 5,50 CHF/m²
+-	31m² bis 60m²: 5,00 CHF/m²
+-	Über 60m²: 4,50 CHF/m²
+2. Aufschlag nach Boden Typ (nach Art des Bodens, pro Quadratmeter):
+-	2. Aufschlag nach Boden Typ (nach Art des Bodens, pro Quadratmeter):Parkett/Laminat: 2,50 CHF/m²
+-	Fliesen: 2,00 CHF/m²
+-	Teppich: 3,50 CHF/m²
+3. Zimmer (pro Raum):
+-	Standard: 80,00 CHF pro Zimmer
+-	Grösseres Zimmer (über 20m²): 30,00 CHF pro Zimmer
+4. Badezimmer (pro Badezimmer):
+-	Badezimmer: 120,00 CHF
+5. Fensterreinigung (pro Fenster):
+-	Standard Fenster: 20,00 CHF
+6. Möbelreinigung:
+-	Sofa: 70,00 CHF pro Sitzplatz
+-	Sessel: 30,00 CHF pro Stück
+7. Reinigung von Haushaltsgeräten (pro Gerät):
+-	Kühlschrank: 80,00 CHF
+-	Backofen: 100,00 CHF
+-	Mikrowelle: 50,00 CHF
+8. Entfernungspauschale:
+-	Bis 10 km: Keine zusätzlichen Kosten
+-	Über 10 km: 2,00 CHF pro km
 
 ---
 
